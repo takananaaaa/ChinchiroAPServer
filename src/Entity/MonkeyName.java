@@ -1,4 +1,4 @@
-package entity;
+package Entity;
 
 /**
  * チンチロにおける役（サルの名前）

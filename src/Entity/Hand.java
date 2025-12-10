@@ -1,4 +1,4 @@
-package entity;
+package Entity;
 
 /**
  * プレイヤーの「役」を表すクラス。
