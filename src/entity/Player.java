@@ -75,4 +75,8 @@ public class Player {
     public void resetRerollCount() {
         this.rerollCount = 0;
     }
+
+    public void setDealer(boolean isDealer) {
+        this.isDealer = isDealer;
+    }
 }
