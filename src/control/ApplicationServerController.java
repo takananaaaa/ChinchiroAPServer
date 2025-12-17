@@ -1,5 +1,6 @@
 package control;
 
+import comunication.GameResultListener;
 import entity.Player;
 import entity.Hand;
 
@@ -13,6 +14,7 @@ import java.util.Map;
  */
 public class ApplicationServerController {
 
+    private GameResultListener listener;
     private List<Player> players;
     private Player currentDealer;
 
@@ -22,6 +24,11 @@ public class ApplicationServerController {
     private Settlement settlement;
 
     // ===== コンストラクタ =====
+    public void setGameResultListener(GameResultListener listener) {
+        this.listener = listener;
+    }
+
+
     public ApplicationServerController(List<Player> players) {
         this.players = players;
         this.currentDealer = players.get(0); // 最初は先頭を親にする
@@ -44,24 +51,25 @@ public class ApplicationServerController {
     // ゲーム開始
     // ==============================
     public void startGame() {
-        System.out.println("=== ゲーム開始 ===");
+        notifyAllPlayers(GamePhase.PLAYING, null, null);
         startBetPhase();
     }
-
     // ==============================
     // 賭けフェーズ
     // ==============================
     private void startBetPhase() {
 
-        System.out.println("=== 賭けフェーズ開始 ===");
+        notifyAllPlayers(GamePhase.BET, null, null);
 
         for (Player p : players) {
             if (p == currentDealer) continue;
-
-            BetController bc = betControllers.get(p);
-            bc.startTimer();
-            // 実際の入力はクライアント側
+            betControllers.get(p).startTimer();
         }
+    }
+
+    private void finishBetPhase() {
+        notifyAllPlayers(GamePhase.BET_FINISHED, null, null);
+        startDicePhase();
     }
 
     // ==============================
@@ -69,21 +77,39 @@ public class ApplicationServerController {
     // ==============================
     public void startDicePhase() {
 
-        System.out.println("=== サイコロフェーズ開始 ===");
+        notifyAllPlayers(GamePhase.ROLL, null, null);
 
         for (Player p : players) {
+
             DiceController dc = diceControllers.get(p);
             dc.startTimer();
             dc.rollDice();
 
             Hand hand = dc.judgeHand();
             p.setCurrentHand(hand);
+        }
 
-            System.out.println(p.getName() + " の役: " + hand.getHandName());
+        finishDicePhase();
+    }
+
+    private void finishDicePhase() {
+
+        for (Player p : players) {
+
+            String result = p.getCurrentHand().getHandStrength() > 0
+                    ? "WIN" : "LOSE";
+
+            notifySinglePlayer(
+                    p,
+                    GamePhase.ROLL_FINISHED,
+                    result,
+                    p.getCurrentHand().getHandName()
+            );
         }
 
         startSettlementPhase();
     }
+
 
     // ==============================
     // 精算フェーズ
@@ -107,8 +133,8 @@ public class ApplicationServerController {
 
         for (Player p : players) {
             if (p.getOwnedBananas() <= 0) {
-                System.out.println("=== ゲーム終了（所持金0） ===");
-                showResult();
+
+                notifyAllPlayers(GamePhase.GAME_END, null, null);
                 return;
             }
         }
@@ -116,6 +142,7 @@ public class ApplicationServerController {
         rotateDealer();
         startBetPhase();
     }
+
 
     private void rotateDealer() {
 
@@ -142,4 +169,41 @@ public class ApplicationServerController {
             );
         }
     }
+
+
+    private void notifyAllPlayers(
+            GamePhase phase,
+            String result,
+            String hand
+    ) {
+        if (sendListener == null) return;
+
+        for (Player p : players) {
+            sendListener.sendUpdate(
+                    p.getName(),
+                    p.getOwnedBananas(),
+                    result,
+                    hand,
+                    phase
+            );
+        }
+    }
+
+    private void notifySinglePlayer(
+            Player p,
+            GamePhase phase,
+            String result,
+            String hand
+    ) {
+        if (sendListener == null) return;
+
+        sendListener.sendUpdate(
+                p.getName(),
+                p.getOwnedBananas(),
+                result,
+                hand,
+                phase
+        );
+    }
+
 }
